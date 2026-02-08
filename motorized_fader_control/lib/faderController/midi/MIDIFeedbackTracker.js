@@ -57,6 +57,8 @@ class MIDIFeedbackTracker {
           this.controller.config.logger.debug(`handleFeedbackMessage called for fader ${faderIndex} with current position ${currentPosition}`);
           this.controller.config.logger.debug(`Current feedbackTracking state: ${JSON.stringify([...this.feedbackTracking])}`);
       }
+      
+      this.controller.config.logger.debug(`[CALIB] handleFeedbackMessage called: fader=${faderIndex}, position=${currentPosition}, isTracking=${this.feedbackTracking.has(faderIndex)}`);
   
       if (this.feedbackTracking.has(faderIndex)) {
           const { targetPosition } = this.feedbackTracking.get(faderIndex);
@@ -89,6 +91,21 @@ class MIDIFeedbackTracker {
   markMovementComplete(faderIndex) {
     try {
       if (this.softwareFeedback) {
+        // Software feedback mode: still need to record timing data for calibration
+        if (this.feedbackTracking.has(faderIndex)) {
+          const { targetPosition } = this.feedbackTracking.get(faderIndex);
+          this.feedbackTracking.delete(faderIndex);
+  
+          const stats = this.feedbackStatistics.get(faderIndex)?.find(
+            stat => stat.targetPosition === targetPosition && !stat.completed
+          );
+          if (stats) {
+            stats.completed = true;
+            stats.endTime = Date.now();
+            stats.duration = stats.endTime - stats.startTime;
+          }
+        }
+        
         const fader = this.controller.getFader(faderIndex);
         fader.updatePositionFeedback(fader.position);
         fader.emitMoveStepComplete(this.getFeedbackStatistics(faderIndex));

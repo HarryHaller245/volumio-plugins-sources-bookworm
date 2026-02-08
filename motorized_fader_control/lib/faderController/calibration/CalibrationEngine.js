@@ -103,17 +103,23 @@ class CalibrationEngine {
 
   async performCalibrationRuns(index, speed, resolution, testParams, runTimes) {
     try {
+      this.config.logger.info(`[CALIB] Starting calibration runs for Fader ${index}, Speed ${speed}, Resolution ${resolution}`);
+      this.config.logger.info(`[CALIB] warmupRuns: ${testParams.warmupRuns}, measureRuns: ${testParams.measureRuns}`);
+      
       for (let i = 0; i < testParams.warmupRuns; i++) {
-        await this.controller.runCalibrationMove(
+        this.config.logger.info(`[CALIB] Warmup run ${i + 1}/${testParams.warmupRuns}`);
+        const warmupDuration = await this.controller.runCalibrationMove(
           index,
           testParams.startProgression,
           testParams.endProgression,
           speed,
           resolution
         );
+        this.config.logger.info(`[CALIB] Warmup complete: ${warmupDuration}ms`);
       }
 
       for (let i = 0; i < testParams.measureRuns; i++) {
+        this.config.logger.info(`[CALIB] Measurement run ${i + 1}/${testParams.measureRuns}`);
         const duration = await this.controller.runCalibrationMove(
           index,
           testParams.startProgression,
@@ -121,6 +127,7 @@ class CalibrationEngine {
           speed,
           resolution
         );
+        this.config.logger.info(`[CALIB] Got duration: ${duration}ms`);
         runTimes.push(duration);
         this.config.logger.info(`Run ${i + 1}: ${duration}ms`);
       }
@@ -132,6 +139,19 @@ class CalibrationEngine {
 
   logStatistics(index, resolution, speed, runTimes, statistics, calibrationResults, logTable) {
     try {
+      // Handle empty or invalid runTimes
+      if (!runTimes || runTimes.length === 0) {
+        this.config.logger.warn(`No timing data for Fader ${index}, Resolution ${resolution}, Speed ${speed}`);
+        calibrationResults[index][resolution][speed] = {
+          runTimes: [],
+          avgTime: null,
+          stdDev: null,
+          effectiveSpeed: null,
+          statistics: []
+        };
+        return;
+      }
+
       const avgTime = runTimes.reduce((a, b) => a + b, 0) / runTimes.length;
       const variance = runTimes.reduce((a, b) => a + Math.pow(b - avgTime, 2), 0) / runTimes.length;
       const stdDev = Math.sqrt(variance);
@@ -165,7 +185,10 @@ class CalibrationEngine {
       let bestConsistency = Infinity;
 
       for (const [resolution, data] of Object.entries(faderData)) {
-        const avgStdDev = Object.values(data).reduce((sum, test) => sum + (test.stdDev || 0), 0) / Object.keys(data).length;
+        const validTests = Object.values(data).filter(test => test.stdDev !== null && test.stdDev !== undefined);
+        if (validTests.length === 0) continue;
+        
+        const avgStdDev = validTests.reduce((sum, test) => sum + test.stdDev, 0) / validTests.length;
         if (avgStdDev < bestConsistency) {
           bestConsistency = avgStdDev;
           bestResolution = Number(resolution);
@@ -179,6 +202,17 @@ class CalibrationEngine {
       }
 
       const effectiveSpeed = faderData[bestResolution][refSpeed].effectiveSpeed;
+      
+      // Handle null or invalid effectiveSpeed
+      if (!effectiveSpeed || effectiveSpeed === null || isNaN(effectiveSpeed) || effectiveSpeed === 0) {
+        this.config.logger.warn(`Invalid effectiveSpeed: ${effectiveSpeed}, using default speedFactor of 1`);
+        return {
+          resolution: bestResolution,
+          speedFactor: 1,
+          consistency: bestConsistency
+        };
+      }
+      
       const speedFactor = refSpeed / effectiveSpeed;
 
       return {

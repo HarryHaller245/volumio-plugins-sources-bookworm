@@ -122,6 +122,7 @@ class MIDIQueue extends FaderEventEmitter {
               await this.send(nextMessage.message);
 
               if (options.disableFeedback === true || this.config.feedback_midi === false) {
+                this.logger.debug(`[CALIB] Simulating feedback for fader ${faderIndex}, position: ${position}`);
                 this.feedbackTracker.handleFeedbackMessage(faderIndex, position, 10);
               }
 

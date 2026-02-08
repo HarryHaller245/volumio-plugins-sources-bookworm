@@ -10,15 +10,15 @@
 ## 📋 Work Phases Overview
 
 ```
-PHASE 0: CLEANUP          (2 hours)  ✓ In Progress
+PHASE 0: CLEANUP          (2 hours)  ✓ Completed
   └─ Move docs to subfolder
   └─ Organize repository structure
 
-PHASE 1: BUGFIX           (4 hours)  [ ] Not Started
-  └─ Fix logging TODOs
-  └─ Add logging to services/eventbus
+PHASE 1: BUGFIX           (4 hours)  🔄 In Progress
+  ✅ Calibration system timing bug fixed
+  ⏳ Remaining logging improvements
 
-PHASE 2: TEST FUNCTION    (6 hours)  [ ] Not Started
+PHASE 2: TEST FUNCTION    (6 hours)  ⏳ Ready to Start
   └─ Create unit test suite (Jest)
   └─ Integration tests
 
@@ -111,10 +111,33 @@ See [docs/STATUS.md](docs/STATUS.md) for full details.
 
 ---
 
-## 🐛 PHASE 1: BUGFIX (4 hours) - NOT STARTED
+## 🐛 PHASE 1: BUGFIX (4 hours) - IN PROGRESS
 
-### Objective
-Fix identified bugs and complete code cleanup, particularly around logging and i18n integration.
+### Objective  
+Fix identified bugs and complete code cleanup, particularly around logging and i18n integration. **CRITICAL: Calibration timing bug identified and fixed.**
+
+### 1.0 ✅ CALIBRATION SYSTEM BUGFIX (COMPLETED)
+
+**Critical Issues Fixed** (Feb 7, 2026):
+- ❌ `runCalibrationMove()` returned undefined `duration` variable
+- ❌ All calibration `runTimes` remained empty `[]`   
+- ❌ Speed factor calculations produced `NaN` for all faders
+- ❌ No validation of calibration data before calculations
+
+**Fixes Applied**:
+1. **Fixed duration extraction** → Extract from `MIDIFeedbackTracker` statistics
+2. **Added data validation** → Check empty arrays before calculating averages
+3. **Added error handling** → Graceful fallback to speedFactor = 1.0
+
+**Files Modified**:
+- ✅ [lib/faderController/core/FaderController.js](../lib/faderController/core/FaderController.js#L557) - Fixed `runCalibrationMove()`
+- ✅ [lib/faderController/calibration/CalibrationEngine.js](../lib/faderController/calibration/CalibrationEngine.js) - Enhanced `logStatistics()` and `calculateOptimalSettings()`
+
+**See**: [docs/CALIBRATION_BUGFIX.md](./CALIBRATION_BUGFIX.md) for detailed analysis
+
+**Status**: ✅ Deployed and ready for testing
+
+---
 
 ### 1.1 Fix Logging TODOs (Lines 63-65 in index.js)
 

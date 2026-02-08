@@ -5,7 +5,7 @@
     },
     "FADER_CONTROLLER_MESSAGE_DELAY": {
       "type": "number",
-      "value": 0.1
+      "value": 10
     },
     "FADER_CONTROLLER_QUEUE_OVERFLOW": {
       "type": "number",
@@ -13,11 +13,11 @@
     },
     "FADER_CONTROLLER_MIDI_LOG": {
       "type": "boolean",
-      "value": false
+      "value": true
     },
     "FADER_CONTROLLER_VALUE_LOG": {
       "type": "boolean",
-      "value": false
+      "value": true
     },
     "FADER_CONTROLLER_MOVE_LOG": {
       "type": "boolean",
@@ -150,6 +150,10 @@
     "FADER_AGGREGATION_DELAY": {
       "type": "number",
       "value": 10
+    },
+    "CALIBRATION_RESOLUTIONS": {
+      "type": "string",
+      "value": "1,0.8,0.5,0.2"
     }
 }
   

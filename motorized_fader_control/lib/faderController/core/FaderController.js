@@ -189,6 +189,7 @@ class FaderController extends FaderEventEmitter {
     this.queueMutex = new Mutex();
     this.reconnectAttempts = 5;
     this.serial = null;
+    this.isShuttingDown = false; // Track intentional shutdown vs unexpected disconnect
     this.initMIDIState();
 
     this.speedMultiplier = 1; //! Adjust this value to control speed
@@ -282,6 +283,12 @@ class FaderController extends FaderEventEmitter {
   }
 
   handleDisconnect() {
+    // Don't treat intentional shutdown as error
+    if (this.isShuttingDown) {
+      this.config.logger.debug('Serial port closed during shutdown (expected)');
+      return;
+    }
+
     const disconnectError = new SerialPortError(
         SerialErrors.SERIAL_PORT_DISCONNECTED,
         'Serial port disconnected',
@@ -555,11 +562,53 @@ class FaderController extends FaderEventEmitter {
   }
 
   async runCalibrationMove(index, StartProgression, EndProgression, speed, resolution) {
-    const fader = this.getFader(index);
-    const faderMove = new FaderMove([index], [StartProgression], [EndProgression], speed, resolution);
-    await this.moveFaders(faderMove, false, false);
-
-    return duration
+    try {
+      const fader = this.getFader(index);
+      // FaderMove(indexes, targets, speeds, resolution)
+      // EndProgression is the target progression (0-100), speed is the movement speed
+      const faderMove = new FaderMove([index], [EndProgression], [speed], resolution);
+      
+      // Calculate how many MIDI messages will be sent
+      const effectiveSpeed = this.calculateEffectiveSpeed(
+        speed,
+        fader.speedFactor,
+        fader.progression,
+        EndProgression
+      );
+      
+      const movements = [{
+        index,
+        target: fader.mapProgression(EndProgression),
+        speed: effectiveSpeed,
+        resolution
+      }];
+      
+      const positions = this.calculateMovements(movements);
+      const messageCount = positions.length;
+      
+      // Calculate MIDI queue processing time: each message has message delay between them
+      const messageDelayMs = this.config.messageDelay || 10; // already in milliseconds from config
+      const queueProcessingTime = messageCount * messageDelayMs;
+      
+      this.config.logger.debug(`[CALIB_MOVE] Fader ${index}: ${StartProgression}→${EndProgression} @speed ${speed}, ${messageCount} messages, ${queueProcessingTime.toFixed(0)}ms queue time`);
+      
+      const startTime = Date.now();
+      
+      // Send all MIDI messages with real hardware feedback (disableFeedback = false for actual movement)
+      await this.moveFaders(faderMove, false, false);
+      
+      // Wait for all MIDI messages to process through the queue
+      await new Promise(resolve => setTimeout(resolve, Math.ceil(queueProcessingTime)));
+      
+      const duration = Date.now() - startTime;
+      
+      this.config.logger.debug(`[CALIB_MOVE] Duration: ${duration}ms (messages: ${messageCount}, delay per msg: ${messageDelayMs.toFixed(1)}ms)`);
+      
+      return duration;
+    } catch (err) {
+      this.config.logger.error(`[CALIB_MOVE] Error in runCalibrationMove: ${err.message}`);
+      throw err;
+    }
   }
 
   //* basic calibration #############################################
@@ -654,11 +703,14 @@ class FaderController extends FaderEventEmitter {
 
   async stop() {
     try {
+      this.isShuttingDown = true; // Set flag before closing
       await this.closeSerial();
       this.config.logger.info('FaderController stopped successfully');
     } catch (error) {
       this.config.logger.error('Error while stopping FaderController:', error);
       this.emit('error', { message: 'Failed to stop FaderController', details: error.message });
+    } finally {
+      this.isShuttingDown = false; // Reset flag
     }
   }
 
