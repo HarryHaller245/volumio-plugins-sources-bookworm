@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# Hardware fader test runner
-# Ensures Volumio is stopped, tails logs, then runs the flow test.
+# Hardware speed test runner
+# Tests individual speeds with user visual confirmation
 
 set -e
 
@@ -43,11 +43,11 @@ ensure_volumio_stopped() {
 
 start_log_tail() {
   echo "Starting log tail in background (journalctl -u volumio)..."
-  journalctl -u "$VOLUMIO_SERVICE" -f --no-pager | grep -E -i "motorized_fader_control|fader|calibration" &
+  journalctl -u "$VOLUMIO_SERVICE" -f --no-pager | grep -E -i "motorized_fader_control|fader|move" &
   LOG_TAIL_PID=$!
 }
 
-echo "Hardware fader flow test"
+echo "Hardware speed test"
 echo "This will stop Volumio before testing and restart it afterward."
 echo ""
 echo "Press ENTER to continue, or Ctrl+C to cancel..."
@@ -57,4 +57,4 @@ ensure_volumio_stopped
 start_log_tail
 
 cd "$PLUGIN_DIR"
-node test_hardware_fader_flow.js "$@"
+node test_hardware_speed.js "$@"

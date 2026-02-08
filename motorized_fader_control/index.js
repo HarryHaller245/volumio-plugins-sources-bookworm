@@ -1052,6 +1052,10 @@ motorizedFaderControl.prototype.setupFaderController = function() {
 				MoveLog: self.config.get('FADER_CONTROLLER_MOVE_LOG', false),
 				calibrateOnStart: self.config.get('FADER_CONTROLLER_CALIBRATION_ON_START', true),
 				queueOverflow: self.config.get('FADER_CONTROLLER_QUEUE_OVERFLOW', 16383),
+				feedback_midi: self.config.get('FADER_CONTROLLER_FEEDBACK_MIDI', true),
+				feedback_tolerance: self.config.get('FADER_CONTROLLER_FEEDBACK_TOLERANCE', 10),
+				disableInternalEventLogging: self.config.get('FADER_CONTROLLER_DISABLE_INTERNAL_EVENT_LOGGING', false),
+				disableEventLogging: self.config.get('FADER_CONTROLLER_DISABLE_EVENT_LOGGING', false),
 				calibrationConfig: {
 					startProgression: self.config.get('CALIBRATION_START_PROGRESSION', 0),
 					endProgression: self.config.get('CALIBRATION_END_PROGRESSION', 100),

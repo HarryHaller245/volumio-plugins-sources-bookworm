@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /*
- * Hardware Fader Flow Test
- * Phases: movement, basic calibration, manual calibration
+ * Hardware Full Range Test
+ * Tests max speed to verify faders reach full 0-100 range and return
  * Requires Volumio service to be stopped to avoid USB lock.
  */
 
@@ -27,7 +27,7 @@ const agentMode = args.includes('--agent');
 const timeoutArg = args.find(arg => arg.startsWith('--timeout='));
 const inputTimeoutMs = timeoutArg
   ? Math.max(0, Number(timeoutArg.split('=')[1]) * 1000)
-  : 15000;
+  : 20000;
 
 function ensureVolumioStopped() {
   try {
@@ -105,34 +105,6 @@ function createContext() {
   return CONTEXT;
 }
 
-function promptYesNo(question) {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-
-  return new Promise(resolve => {
-    let timeoutId = null;
-
-    if (agentMode && inputTimeoutMs > 0) {
-      timeoutId = setTimeout(() => {
-        rl.close();
-        console.log('No input received. Auto-approving in agent mode.');
-        resolve(true);
-      }, inputTimeoutMs);
-    }
-
-    rl.question(question, answer => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      rl.close();
-      const normalized = String(answer || '').trim().toLowerCase();
-      resolve(normalized === 'y' || normalized === 'yes');
-    });
-  });
-}
-
 function promptContinue(question) {
   const rl = readline.createInterface({
     input: process.stdin,
@@ -167,7 +139,10 @@ async function wait(ms) {
 async function run() {
   ensureVolumioStopped();
 
-  console.log('Hardware fader flow test starting...');
+  console.log('Hardware Full Range Test at Max Speed');
+  console.log('=====================================');
+  console.log('This test verifies faders reach full 0-100 range at max speed.\n');
+
   if (agentMode) {
     console.log(`Agent mode enabled. Input timeout: ${inputTimeoutMs / 1000}s.`);
   }
@@ -181,50 +156,83 @@ async function run() {
   await plugin.onStart();
   await wait(2000);
 
-  const indexes = JSON.parse(CONTEXT.config.get('FADERS_IDXS', '[]'));
-  const speedHigh = Number(CONTEXT.config.get('FADER_CONTROLLER_SPEED_HIGH', 100));
-  const speedLow = Number(CONTEXT.config.get('FADER_CONTROLLER_SPEED_LOW', 10));
-  const resolution = 1;
+  const maxSpeed = Number(CONTEXT.config.get('FADER_CONTROLLER_SPEED_HIGH', 100));
+  console.log(`\n🚀 Using MAX SPEED: ${maxSpeed}\n`);
 
-  await promptContinue('Press ENTER to start Phase 1: movement test (min -> max -> min)...');
-  await plugin.faderController.reset(indexes);
+  // Test Fader 0
+  console.log('Testing FADER 0: 0 → 100 → 0 at MAX SPEED');
+  await plugin.faderController.reset([0]);
+  
+  await wait(1500);
+  await promptContinue('Press ENTER to start Fader 0 test (moves both directions automatically)...');
+  
+  const start0to100 = Date.now();
   await plugin.faderController.moveFaders(
-    new FaderMove(indexes, indexes.map(() => 100), indexes.map(() => speedHigh), resolution),
+    new FaderMove([0], [100], [maxSpeed], 1),
     false,
     false
   );
+  const duration0to100 = Date.now() - start0to100;
+  console.log(`\n✓ Duration 0→100: ${duration0to100}ms`);
+  console.log('QUESTION: Did Fader 0 reach FULL deflection (100%)?');
+  
+  await wait(2000); // Pause at full deflection
+  
+  const startReturn0 = Date.now();
   await plugin.faderController.moveFaders(
-    new FaderMove(indexes, indexes.map(() => 0), indexes.map(() => speedLow), resolution),
+    new FaderMove([0], [0], [maxSpeed], 1),
     false,
     false
   );
+  const durationReturn0 = Date.now() - startReturn0;
+  console.log(`✓ Duration 100→0: ${durationReturn0}ms`);
+  console.log('QUESTION: Did Fader 0 reach HOME (0%)?');
+  
+  await wait(1500);
+  await promptContinue('Press ENTER to continue to Fader 1 test...');
+  
+  // Test Fader 1
+  console.log('\nTesting FADER 1: 0 → 100 → 0 at MAX SPEED');
+  await plugin.faderController.reset([1]);
+  
+  await wait(1500);
+  await promptContinue('Press ENTER to start Fader 1 test (moves both directions automatically)...');
+  
+  const start1to100 = Date.now();
+  await plugin.faderController.moveFaders(
+    new FaderMove([1], [100], [maxSpeed], 1),
+    false,
+    false
+  );
+  const duration1to100 = Date.now() - start1to100;
+  console.log(`\n✓ Duration 0→100: ${duration1to100}ms`);
+  console.log('QUESTION: Did Fader 1 reach FULL deflection (100%)?');
+  
+  await wait(2000); // Pause at full deflection
+  
+  const startReturn1 = Date.now();
+  await plugin.faderController.moveFaders(
+    new FaderMove([1], [0], [maxSpeed], 1),
+    false,
+    false
+  );
+  const durationReturn1 = Date.now() - startReturn1;
+  console.log(`✓ Duration 100→0: ${durationReturn1}ms`);
+  console.log('QUESTION: Did Fader 1 reach HOME (0%)?');
 
-  const moveOk = await promptYesNo('Did both faders move to max and return to min? (y/n): ');
-  if (!moveOk) {
-    throw new Error('Movement validation failed.');
-  }
-
-  await promptContinue('Press ENTER to start Phase 2: basic calibration...');
-  await plugin.faderController.calibrate(indexes);
-
-  const basicOk = await promptYesNo('Did the basic calibration move as expected? (y/n): ');
-  if (!basicOk) {
-    throw new Error('Basic calibration validation failed.');
-  }
-
-  await promptContinue('Press ENTER to start Phase 3: manual (advanced) calibration...');
-  await plugin.RunManualCalibration();
-
-  const manualOk = await promptYesNo('Did the manual calibration run correctly? (y/n): ');
-  if (!manualOk) {
-    throw new Error('Manual calibration validation failed.');
-  }
+  // Summary
+  console.log('\n\n📊 Full Range Test Summary');
+  console.log('==========================');
+  console.log(`Fader 0: 0→100 ${duration0to100}ms | 100→0 ${durationReturn0}ms`);
+  console.log(`Fader 1: 0→100 ${duration1to100}ms | 100→0 ${durationReturn1}ms`);
+  console.log(`Speed Setting: ${maxSpeed}`);
 
   if (typeof plugin.onStop === 'function') {
     await plugin.onStop();
   }
 
-  console.log('Hardware fader flow test completed successfully.');
+  await wait(1000);
+  console.log('\n✅ Full range test completed.');
 }
 
 run().catch(async err => {

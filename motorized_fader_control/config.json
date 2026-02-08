@@ -11,6 +11,22 @@
       "type": "number",
       "value": 10000000
     },
+    "FADER_CONTROLLER_FEEDBACK_MIDI": {
+      "type": "boolean",
+      "value": true
+    },
+    "FADER_CONTROLLER_FEEDBACK_TOLERANCE": {
+      "type": "number",
+      "value": 10
+    },
+    "FADER_CONTROLLER_DISABLE_INTERNAL_EVENT_LOGGING": {
+      "type": "boolean",
+      "value": false
+    },
+    "FADER_CONTROLLER_DISABLE_EVENT_LOGGING": {
+      "type": "boolean",
+      "value": false
+    },
     "FADER_CONTROLLER_MIDI_LOG": {
       "type": "boolean",
       "value": true
@@ -25,7 +41,7 @@
     },
     "FADER_CONTROLLER_CALIBRATION_ON_START": {
       "type": "boolean",
-      "value": true
+      "value": false
     },
     "FADER_CONTROLLER_MOVE_RESOLUTION": {
       "type": "number",

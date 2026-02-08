@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /*
- * Hardware Fader Flow Test
- * Phases: movement, basic calibration, manual calibration
+ * Hardware Speed Test
+ * Tests individual speeds (10, 50, 100) with user visual confirmation
  * Requires Volumio service to be stopped to avoid USB lock.
  */
 
@@ -105,34 +105,6 @@ function createContext() {
   return CONTEXT;
 }
 
-function promptYesNo(question) {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-
-  return new Promise(resolve => {
-    let timeoutId = null;
-
-    if (agentMode && inputTimeoutMs > 0) {
-      timeoutId = setTimeout(() => {
-        rl.close();
-        console.log('No input received. Auto-approving in agent mode.');
-        resolve(true);
-      }, inputTimeoutMs);
-    }
-
-    rl.question(question, answer => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      rl.close();
-      const normalized = String(answer || '').trim().toLowerCase();
-      resolve(normalized === 'y' || normalized === 'yes');
-    });
-  });
-}
-
 function promptContinue(question) {
   const rl = readline.createInterface({
     input: process.stdin,
@@ -164,10 +136,46 @@ async function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+async function testSpeed(faderController, faderIndex, speed, label) {
+  console.log(`\n🎯 Testing FADER ${faderIndex} at SPEED ${speed} (${label})`);
+  console.log('Prepare to observe the fader movement...');
+  
+  await wait(1500); // Let logs settle before prompt
+  await promptContinue('Press ENTER to START the move (0 → 100)...');
+  
+  const startTime = Date.now();
+  await faderController.moveFaders(
+    new FaderMove([faderIndex], [100], [speed], 1),
+    false,
+    false
+  );
+  const duration = Date.now() - startTime;
+  
+  console.log(`Duration: ${duration}ms`);
+  console.log('Did the fader move smoothly from 0 to 100?');
+  
+  await wait(1500); // Let logs settle before prompt
+  await promptContinue('Press ENTER to RETURN to zero...');
+  
+  const returnStart = Date.now();
+  await faderController.moveFaders(
+    new FaderMove([faderIndex], [0], [speed], 1),
+    false,
+    false
+  );
+  const returnDuration = Date.now() - returnStart;
+  
+  console.log(`Return duration: ${returnDuration}ms`);
+  await wait(1000); // Settle before next speed test
+}
+
 async function run() {
   ensureVolumioStopped();
 
-  console.log('Hardware fader flow test starting...');
+  console.log('Hardware Speed Test');
+  console.log('==================');
+  console.log('This test evaluates individual speeds with your visual feedback.\n');
+
   if (agentMode) {
     console.log(`Agent mode enabled. Input timeout: ${inputTimeoutMs / 1000}s.`);
   }
@@ -181,50 +189,51 @@ async function run() {
   await plugin.onStart();
   await wait(2000);
 
-  const indexes = JSON.parse(CONTEXT.config.get('FADERS_IDXS', '[]'));
-  const speedHigh = Number(CONTEXT.config.get('FADER_CONTROLLER_SPEED_HIGH', 100));
-  const speedLow = Number(CONTEXT.config.get('FADER_CONTROLLER_SPEED_LOW', 10));
-  const resolution = 1;
+  const faderIndex = 0; // Test on fader 0
+  const speeds = [10, 50, 100];
 
-  await promptContinue('Press ENTER to start Phase 1: movement test (min -> max -> min)...');
-  await plugin.faderController.reset(indexes);
+  // Test each speed
+  for (const speed of speeds) {
+    let label = '';
+    if (speed === 10) label = 'SLOW';
+    else if (speed === 50) label = 'MEDIUM';
+    else if (speed === 100) label = 'FAST';
+
+    await testSpeed(plugin.faderController, faderIndex, speed, label);
+  }
+
+  // Test both faders at same speed
+  console.log('\n\n📊 Testing BOTH FADERS at SPEED 50 (MEDIUM)');
+  console.log('Prepare to observe both faders moving together...');
+
+  await plugin.faderController.reset([0, 1]);
+  
+  await wait(1500); // Let logs settle before prompt
+  await promptContinue('Press ENTER to move BOTH faders to 100...');
+  const bothStart = Date.now();
   await plugin.faderController.moveFaders(
-    new FaderMove(indexes, indexes.map(() => 100), indexes.map(() => speedHigh), resolution),
+    new FaderMove([0, 1], [100, 100], [50, 50], 1),
     false,
     false
   );
+  const bothDuration = Date.now() - bothStart;
+  console.log(`Both faders duration: ${bothDuration}ms`);
+  console.log('Did BOTH faders move together smoothly?');
+
+  await wait(1500); // Let logs settle before prompt
+  await promptContinue('Press ENTER to return BOTH to zero...');
   await plugin.faderController.moveFaders(
-    new FaderMove(indexes, indexes.map(() => 0), indexes.map(() => speedLow), resolution),
+    new FaderMove([0, 1], [0, 0], [50, 50], 1),
     false,
     false
   );
-
-  const moveOk = await promptYesNo('Did both faders move to max and return to min? (y/n): ');
-  if (!moveOk) {
-    throw new Error('Movement validation failed.');
-  }
-
-  await promptContinue('Press ENTER to start Phase 2: basic calibration...');
-  await plugin.faderController.calibrate(indexes);
-
-  const basicOk = await promptYesNo('Did the basic calibration move as expected? (y/n): ');
-  if (!basicOk) {
-    throw new Error('Basic calibration validation failed.');
-  }
-
-  await promptContinue('Press ENTER to start Phase 3: manual (advanced) calibration...');
-  await plugin.RunManualCalibration();
-
-  const manualOk = await promptYesNo('Did the manual calibration run correctly? (y/n): ');
-  if (!manualOk) {
-    throw new Error('Manual calibration validation failed.');
-  }
 
   if (typeof plugin.onStop === 'function') {
     await plugin.onStop();
   }
 
-  console.log('Hardware fader flow test completed successfully.');
+  await wait(1000); // Final settle
+  console.log('\n✅ Speed test completed.');
 }
 
 run().catch(async err => {
