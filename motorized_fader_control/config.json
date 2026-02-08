@@ -19,6 +19,10 @@
       "type": "number",
       "value": 10
     },
+    "FADER_CONTROLLER_FEEDBACK_CHANNEL_OFFSET": {
+      "type": "number",
+      "value": 4
+    },
     "FADER_CONTROLLER_DISABLE_INTERNAL_EVENT_LOGGING": {
       "type": "boolean",
       "value": false
@@ -29,11 +33,11 @@
     },
     "FADER_CONTROLLER_MIDI_LOG": {
       "type": "boolean",
-      "value": true
+      "value": false
     },
     "FADER_CONTROLLER_VALUE_LOG": {
       "type": "boolean",
-      "value": true
+      "value": false
     },
     "FADER_CONTROLLER_MOVE_LOG": {
       "type": "boolean",

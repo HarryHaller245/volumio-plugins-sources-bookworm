@@ -71,7 +71,6 @@ class MIDIParser extends Transform {
         this.data1 = 0;
         this.data2 = 0;
         this.buffer = []; // Add a buffer to store incoming MIDI messages
-        this.inSysex = false;
     }
 
     /**
@@ -87,31 +86,14 @@ class MIDIParser extends Transform {
     _transform(chunk, encoding, callback) {
         for (let i = 0; i < chunk.length; i++) {
             const byte = chunk[i];
-    
-            if (byte === 0xF0) {
-                this.inSysex = true;
-                this.sysexBuffer = [byte];
-                continue;
-            }
-    
-            if (this.inSysex) {
-                this.sysexBuffer.push(byte);
-                if (byte === 0xF7) {
-                    // Full SysEx message captured
-                    this.push(Buffer.from(this.sysexBuffer));
-                    this.inSysex = false;
-                    this.sysexBuffer = [];
-                }
-                continue;
-            }
-    
-            // Existing logic for regular MIDI messages
+            
+            // Parse standard MIDI messages (3-byte messages)
             this.buffer.push(byte);
             while (this.buffer.length >= 3 && this.parse_midi(this.buffer)) {
                 const midiData = Buffer.from([this.type, this.channel, this.data1, this.data2]);
                 this.push(midiData);
                 this.buffer = this.buffer.slice(3);  // Remove just the parsed bytes
-              }
+            }
         }
         callback();
     }

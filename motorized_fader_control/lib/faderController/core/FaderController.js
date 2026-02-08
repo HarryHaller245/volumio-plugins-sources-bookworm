@@ -175,6 +175,7 @@ class FaderController extends FaderEventEmitter {
       calibrateOnStart: true,
       feedback_midi: true, // enable if midi device supports feedback
       feedback_tolerance: 10, // tolerance for feedback
+      feedback_channel_offset: 4, // Feedback Pitch Bend uses channels: faderIdx + offset
       disableInternalEventLogging: false, // Disable internal event logging
       disableEventLogging: false, // Disable all event logging
       ...config
@@ -316,7 +317,20 @@ class FaderController extends FaderEventEmitter {
 
         switch(message.type) {
             case 'PITCH_BEND':
-                this.handleFaderMove(message);
+                // Distinguish feedback (offset channels) from control (direct channels)
+                const offset = this.config.feedback_channel_offset || 4;
+                const isFeedbackChannel = message.channel >= offset && message.channel < (offset + this.faders.length);
+                
+                if (isFeedbackChannel) {
+                    // Map feedback channel back to fader index
+                    const feedbackMessage = {
+                        ...message,
+                        channel: message.channel - offset
+                    };
+                    this.handleFeedbackPitchBend(feedbackMessage);
+                } else {
+                    this.handleFaderMove(message);
+                }
                 break;
             case 'NOTE_ON':
             case 'NOTE_OFF':
@@ -326,16 +340,14 @@ class FaderController extends FaderEventEmitter {
                 this.midiCache.push(message);
                 // this.cacheMIDIStatus(message.raw);
                 break;
-            case 'SYSEX':
-                this.handleSysExFeedback(message);
-                break;
         }
     } catch (error) {
         this.emit('error', error);
     }
   }
 
-  handleSysExFeedback(message) {
+  handleFeedbackPitchBend(message) {
+    // New Pitch Bend feedback on offset channels
     const position = (message.data2 << 7) | message.data1;
     const fader = this.getFader(message.channel);
 

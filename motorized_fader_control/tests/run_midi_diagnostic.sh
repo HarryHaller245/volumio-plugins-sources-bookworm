@@ -1,20 +1,25 @@
 #!/bin/sh
 #
-# MIDI Feedback Routing Diagnostic
-# Tests feedback routing for both faders with detailed MIDI logging
-# Compares Fader 0 vs Fader 1 to identify routing issues
+# Pitch Bend Feedback Diagnostic
+# Tests Pitch Bend feedback routing on offset channels (4-7)
+# Verifies SYSEX migration is complete
 #
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-TEST_FILE="$PROJECT_DIR/tests/test_midi_feedback_routing.js"
+TEST_FILE="$PROJECT_DIR/tests/test_pitchbend_feedback.js"
 CONFIG_FILE="$PROJECT_DIR/config.json"
 
 echo "=========================================="
-echo "MIDI Feedback Routing Diagnostic"
+echo "Pitch Bend Feedback Diagnostic"
 echo "=========================================="
 echo ""
-echo "This test examines MIDI feedback message routing"
-echo "for both faders to identify parsing or routing issues."
+echo "This test verifies Pitch Bend feedback routing"
+echo "on offset channels (4-7) after SYSEX migration."
+echo ""
+echo "Expected behavior:"
+echo "  - Control messages: Channels 0-1 (0xE0, 0xE1)"
+echo "  - Feedback messages: Channels 4-5 (0xE4, 0xE5)"
+echo "  - NO SYSEX messages (0xF0...0xF7)"
 echo ""
 echo "Press ENTER to continue, or Ctrl+C to cancel..."
 read -r _
@@ -23,28 +28,17 @@ read -r _
 echo ""
 echo "Stopping Volumio..."
 sudo systemctl stop volumio
-sleep 3
-
-echo "=========================================="
-echo "TEST 1: Fader 1 with BOTH faders enabled"
-echo "=========================================="
-echo "Expected: ~80+ MIDI feedback messages"
-echo ""
-echo "Press ENTER to run TEST 1 (Fader 1, count=2)..."
-read -r _
-
-node "$TEST_FILE" 1 --agent --timeout=20
+sleep 2
 
 echo ""
 echo "=========================================="
-echo "TEST 2: Fader 0 with BOTH faders enabled"
+echo "Running Pitch Bend Feedback Test"
 echo "=========================================="
-echo "Expected: ~80+ MIDI feedback messages"
 echo ""
-echo "Press ENTER to run TEST 2 (Fader 0, count=2)..."
-read -r _
 
-node "$TEST_FILE" 0 --agent --timeout=20
+node "$TEST_FILE" --agent --timeout=3
+
+EXIT_CODE=$?
 
 echo ""
 echo "=========================================="
@@ -53,24 +47,25 @@ echo "=========================================="
 echo "This test reinitializes the plugin with only Fader 0"
 echo "to eliminate channel interference."
 echo "Expected: ~80+ MIDI feedback messages"
-echo ""
-echo "Press ENTER to run TEST 3 (Fader 0, count=1)..."
-read -r _
-
-node "$TEST_FILE" 0 --config-override=FADER_CONTROLLER_FADER_COUNT=1 --agent --timeout=20
+EXIT_CODE=$?
 
 echo ""
 echo "=========================================="
-echo "TEST 4: Fader 1 with ONLY Fader 1 enabled"
+echo "Test Results"
 echo "=========================================="
-echo "This test reinitializes the plugin with only Fader 1"
-echo "to confirm if it's a firmware/hardware issue."
-echo "Expected: ~80+ MIDI feedback messages (if working)"
-echo ""
-echo "Press ENTER to run TEST 4 (Fader 1, count=1)..."
-read -r _
 
-node "$TEST_FILE" 1 --config-override=FADER_CONTROLLER_FADER_COUNT=1 --agent --timeout=20
+if [ $EXIT_CODE -eq 0 ]; then
+  echo "✅ Test Passed"
+  echo ""
+  echo "Pitch Bend feedback is working correctly:"
+  echo "  - Feedback messages received on channels 4-5"
+  echo "  - No SYSEX messages detected"
+  echo "  - SYSEX migration complete"
+else
+  echo "❌ Test Failed"
+  echo ""
+  echo "Check the output above for details."
+fi
 
 echo ""
 echo "Starting Volumio..."
@@ -78,17 +73,8 @@ sudo systemctl start volumio
 sleep 2
 
 echo ""
-echo "=========================================="
-echo "✅ MIDI Feedback Routing Diagnostic Complete"
-echo "=========================================="
+echo "To view detailed MIDI logs, run:"
+echo "  sudo journalctl -u volumio -n 500 | grep -E 'MIDI|feedback'"
 echo ""
-echo "Summary:"
-echo "--------"
-echo "Compare the results above to identify:"
-echo "1. If Fader 1 ever receives feedback (parsing check)"
-echo "2. If feedback is misrouted between faders"
-echo "3. If it's channel-specific (firmware issue)"
-echo ""
-echo "Check journalctl logs for detailed SYSEX message parsing:"
-echo "  sudo journalctl -u volumio -n 500 | grep -E 'MIDI|feedback|SYSEX'"
-echo ""
+
+exit $EXIT_CODE

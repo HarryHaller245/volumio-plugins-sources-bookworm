@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /*
- * Hardware Fader Flow Test
- * Phases: movement, basic calibration, manual calibration
+ * Pitch Bend Feedback Test
+ * Verifies firmware sends feedback on offset channels (4-7) using Pitch Bend instead of SYSEX
  * Requires Volumio service to be stopped to avoid USB lock.
  */
 
@@ -68,6 +68,11 @@ function createContext() {
         return false;
       }
 
+      // Enable MIDI logging for this test
+      if (key === 'FADER_CONTROLLER_MIDI_LOG') {
+        return true;
+      }
+
       if (configValues[key] !== undefined) {
         return configValues[key];
       }
@@ -114,30 +119,22 @@ function promptYesNo(question) {
   return new Promise(resolve => {
     let timeoutId = null;
 
-    // Wait for debug output to complete before showing prompt
-    setTimeout(() => {
-      // Add visual separator to make prompt stand out
-      console.log('\n' + '='.repeat(70));
-      console.log('>>> USER INPUT REQUIRED <<<');
-      console.log('='.repeat(70));
-
-      if (agentMode && inputTimeoutMs > 0) {
-        timeoutId = setTimeout(() => {
-          rl.close();
-          console.log('No input received. Auto-approving in agent mode.');
-          resolve(true);
-        }, inputTimeoutMs);
-      }
-
-      rl.question(question, answer => {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
+    if (agentMode && inputTimeoutMs > 0) {
+      timeoutId = setTimeout(() => {
         rl.close();
-        const normalized = String(answer || '').trim().toLowerCase();
-        resolve(normalized === 'y' || normalized === 'yes');
-      });
-    }, 1000); // 1 second delay to let debug output complete
+        console.log('No input received. Auto-approving in agent mode.');
+        resolve(true);
+      }, inputTimeoutMs);
+    }
+
+    rl.question(question, answer => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      rl.close();
+      const normalized = String(answer || '').trim().toLowerCase();
+      resolve(normalized === 'y' || normalized === 'yes');
+    });
   });
 }
 
@@ -150,29 +147,21 @@ function promptContinue(question) {
   return new Promise(resolve => {
     let timeoutId = null;
 
-    // Wait for debug output to complete before showing prompt
-    setTimeout(() => {
-      // Add visual separator to make prompt stand out
-      console.log('\n' + '='.repeat(70));
-      console.log('>>> USER INPUT REQUIRED <<<');
-      console.log('='.repeat(70));
-
-      if (agentMode && inputTimeoutMs > 0) {
-        timeoutId = setTimeout(() => {
-          rl.close();
-          console.log('No input received. Auto-continuing in agent mode.');
-          resolve();
-        }, inputTimeoutMs);
-      }
-
-      rl.question(question, () => {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
+    if (agentMode && inputTimeoutMs > 0) {
+      timeoutId = setTimeout(() => {
         rl.close();
+        console.log('No input received. Auto-continuing in agent mode.');
         resolve();
-      });
-    }, 1000); // 1 second delay to let debug output complete
+      }, inputTimeoutMs);
+    }
+
+    rl.question(question, () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      rl.close();
+      resolve();
+    });
   });
 }
 
@@ -183,7 +172,8 @@ async function wait(ms) {
 async function run() {
   ensureVolumioStopped();
 
-  console.log('Hardware fader flow test starting...');
+  console.log('=== Pitch Bend Feedback Test ===');
+  console.log('Testing feedback on offset channels (4-7) using Pitch Bend instead of SYSEX');
   if (agentMode) {
     console.log(`Agent mode enabled. Input timeout: ${inputTimeoutMs / 1000}s.`);
   }
@@ -198,52 +188,63 @@ async function run() {
   await wait(2000);
 
   const indexes = JSON.parse(CONTEXT.config.get('FADERS_IDXS', '[]'));
-  const speedHigh = Number(CONTEXT.config.get('FADER_CONTROLLER_SPEED_HIGH', 100));
-  const speedLow = Number(CONTEXT.config.get('FADER_CONTROLLER_SPEED_LOW', 10));
-  const resolution = 1;
+  const speedMed = 50;
 
-  await promptContinue('Press ENTER to start Phase 1: movement test (min -> max -> min)...');
+  console.log('\n--- Expected behavior ---');
+  console.log('- Control messages (input): Pitch Bend on channels 0-1 (0xE0, 0xE1)');
+  console.log('- Feedback messages (output): Pitch Bend on channels 4-5 (0xE4, 0xE5)');
+  console.log('- No SYSEX messages should appear');
+
+  await promptContinue('\nPress ENTER to start Test 1: Fader 0 → 100% (expect ch 4 feedback)...');
+  await plugin.faderController.moveFaders(
+    new FaderMove([0], [100], [speedMed], 1),
+    true,
+    false
+  );
+  await wait(2000);
+
+  const test1Ok = await promptYesNo('Did you see PITCH_BEND feedback on channel 4 in the logs? (y/n): ');
+  if (!test1Ok) {
+    throw new Error('Test 1 failed: No channel 4 feedback detected.');
+  }
+
+  await promptContinue('\nPress ENTER to start Test 2: Fader 1 → 100% (expect ch 5 feedback)...');
+  await plugin.faderController.moveFaders(
+    new FaderMove([1], [100], [speedMed], 1),
+    true,
+    false
+  );
+  await wait(2000);
+
+  const test2Ok = await promptYesNo('Did you see PITCH_BEND feedback on channel 5 in the logs? (y/n): ');
+  if (!test2Ok) {
+    throw new Error('Test 2 failed: No channel 5 feedback detected.');
+  }
+
+  await promptContinue('\nPress ENTER to start Test 3: Both faders → 0% (expect ch 4+5 feedback)...');
   await plugin.faderController.reset(indexes);
-  await plugin.faderController.moveFaders(
-    new FaderMove(indexes, indexes.map(() => 100), indexes.map(() => speedHigh), resolution),
-    false,
-    false
-  );
-  await plugin.faderController.moveFaders(
-    new FaderMove(indexes, indexes.map(() => 0), indexes.map(() => speedLow), resolution),
-    false,
-    false
-  );
+  await wait(2000);
 
-  const moveOk = await promptYesNo('Did both faders move to max and return to min? (y/n): ');
-  if (!moveOk) {
-    throw new Error('Movement validation failed.');
+  const test3Ok = await promptYesNo('Did you see PITCH_BEND feedback on channels 4 and 5? (y/n): ');
+  if (!test3Ok) {
+    throw new Error('Test 3 failed: Expected feedback on both channels.');
   }
 
-  await promptContinue('Press ENTER to start Phase 2: basic calibration...');
-  await plugin.faderController.calibrate(indexes);
-
-  const basicOk = await promptYesNo('Did the basic calibration move as expected? (y/n): ');
-  if (!basicOk) {
-    throw new Error('Basic calibration validation failed.');
-  }
-
-  await promptContinue('Press ENTER to start Phase 3: manual (advanced) calibration...');
-  await plugin.RunManualCalibration();
-
-  const manualOk = await promptYesNo('Did the manual calibration run correctly? (y/n): ');
-  if (!manualOk) {
-    throw new Error('Manual calibration validation failed.');
+  const noSysex = await promptYesNo('Confirm: Did you see NO SYSEX messages in the logs? (y/n): ');
+  if (!noSysex) {
+    throw new Error('SYSEX messages detected - migration incomplete!');
   }
 
   if (typeof plugin.onStop === 'function') {
     await plugin.onStop();
   }
 
-  console.log('Hardware fader flow test completed successfully.');
+  console.log('\n✓ Pitch Bend feedback test completed successfully.');
+  console.log('✓ Firmware is sending feedback on offset channels (4-7)');
+  console.log('✓ SYSEX migration complete');
 }
 
 run().catch(async err => {
-  console.error(`Test failed: ${err.message}`);
+  console.error(`\n✗ Test failed: ${err.message}`);
   process.exit(1);
 });

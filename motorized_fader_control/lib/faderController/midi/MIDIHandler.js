@@ -44,27 +44,7 @@ class MIDIHandler extends FaderEventEmitter {
     try {
         if (!buffer || buffer.length < 1) return null;
 
-        if (buffer[0] === 0xF0 && buffer[buffer.length - 1] === 0xF7) {
-
-          if (buffer.length < 6) throw new MIDIError('SYSEX_ERROR', 'Malformed SysEx message', { rawData: buffer });
-          // SysEx message: [F0 7D channel LSB MSB F7]
-          const data = buffer.slice(1, -1); // Remove F0 and F7
-          if (data.length < 4) throw new MIDIError('SYSEX_ERROR', 'Malformed SysEx payload', { rawData: buffer });
-          if (data[0] !== 0x7D) throw new MIDIError('SYSEX_ERROR', 'Unknown SysEx manufacturer ID', { rawData: buffer });
-
-          const message = {
-            raw: buffer,
-            type: 'SYSEX',
-            manufacturerId: data[0],
-            channel: data[1],
-            data1: data[2],
-            data2: data[3],
-          };
-
-          return message;
-        }
-
-        // Existing logic for standard MIDI
+        // Parse standard MIDI messages
         if (buffer.length < 3) throw new MIDIError('Invalid MIDI buffer', { rawData: buffer });
 
         const message = {
