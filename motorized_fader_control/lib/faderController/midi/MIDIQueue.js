@@ -69,12 +69,6 @@ class MIDIQueue extends FaderEventEmitter {
           })}`);
         }
 
-        const targetPosition = this.get_position(message);
-        if (!this.feedbackTracker.isTrackingFeedback(faderIndex)) {
-          this.feedbackTracker.trackFeedbackStart(faderIndex, targetPosition); // always do this
-          // only if not already tracking feedback for this fader ?
-        }
-
         this.process(options);
       } catch (error) {
         this.logger.error(`Error adding MIDI message to queue: ${error.message}`, { message, options });
@@ -112,7 +106,6 @@ class MIDIQueue extends FaderEventEmitter {
         const messages = this.queue.get(faderIndex);
 
         if (messages && messages.length > 0) {
-          const targetPosition = this.get_position(messages[messages.length - 1].message);
 
           while (messages.length > 0) {
             const nextMessage = messages.shift();
@@ -122,7 +115,7 @@ class MIDIQueue extends FaderEventEmitter {
               await this.send(nextMessage.message);
 
               if (options.disableFeedback === true || this.config.feedback_midi === false) {
-                this.logger.debug(`[CALIB] Simulating feedback for fader ${faderIndex}, position: ${position}`);
+                this.logger.debug(`[SIM FEEDBACK] Simulating feedback for fader ${faderIndex}, position: ${position}`);
                 this.feedbackTracker.handleFeedbackMessage(faderIndex, position, 10);
               }
 

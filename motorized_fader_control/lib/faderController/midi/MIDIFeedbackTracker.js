@@ -18,7 +18,7 @@ class MIDIFeedbackTracker {
   }
 
   clearAllFeedback() {
-    this.trackedFeedback.clear();
+    this.feedbackTracking.clear();
   }
 
   getTargetPosition(faderIndex) {
@@ -54,11 +54,9 @@ class MIDIFeedbackTracker {
 
   handleFeedbackMessage(faderIndex, currentPosition, tolerance = 0) {
       if (this.controller.config.MIDILog) {
-          this.controller.config.logger.debug(`handleFeedbackMessage called for fader ${faderIndex} with current position ${currentPosition}`);
           this.controller.config.logger.debug(`Current feedbackTracking state: ${JSON.stringify([...this.feedbackTracking])}`);
       }
       
-      this.controller.config.logger.debug(`[CALIB] handleFeedbackMessage called: fader=${faderIndex}, position=${currentPosition}, isTracking=${this.feedbackTracking.has(faderIndex)}`);
   
       if (this.feedbackTracking.has(faderIndex)) {
           const { targetPosition } = this.feedbackTracking.get(faderIndex);

@@ -33,11 +33,11 @@
     },
     "FADER_CONTROLLER_MIDI_LOG": {
       "type": "boolean",
-      "value": false
+      "value": true
     },
     "FADER_CONTROLLER_VALUE_LOG": {
       "type": "boolean",
-      "value": false
+      "value": true
     },
     "FADER_CONTROLLER_MOVE_LOG": {
       "type": "boolean",
@@ -153,7 +153,7 @@
     },
     "LOG_LEVEL": {
       "type": "string",
-      "value": "debug"
+      "value": "info"
     },
     "DEBUG_MODE": {
       "type": "boolean",

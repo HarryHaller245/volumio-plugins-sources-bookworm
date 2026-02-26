@@ -77,6 +77,34 @@
 
 ## 🚀 DEPLOYMENT & TESTING STATUS
 
+### ✅ Phase 0: Hardware Validation (IN PROGRESS - Feb 8, 2026)
+**Purpose:** Validate hardware behavior before full integration testing
+
+#### ✅ Test 0.1: Hardware Speed Test (COMPLETED - Feb 8, 2026)
+**File:** `test_hardware_speed.js`  
+**Hardware:** Arduino Nano, dual motorized faders @ 1 Mbps UART  
+**Results:**
+- Speed 10: 89 positions, 29ms, smooth - still fairly fast
+- Speed 50: 49 positions, 35ms, smooth - good balance
+- Speed 100: 1 position, 2ms, instant jump
+- Dual faders: Perfect synchronization, no lag
+
+**Key Findings:**
+- All movements smooth, no jitter
+- Speed differences less pronounced than expected (10 still fast, 50-100 similar)
+- Both faders synchronized perfectly
+- Software feedback simulation working during calibration resets
+
+**Next:** Test software vs hardware feedback comparison
+
+#### ⚪ Test 0.2: Feedback Comparison (PENDING)
+**Purpose:** Compare software simulation vs hardware feedback behavior
+
+#### ⚪ Test 0.3: Manual Calibration (PENDING)
+**Purpose:** Validate manual calibration flow with real hardware
+
+---
+
 ### ✅ Phase 1: Validation (COMPLETE)
 ```bash
 ./test_plugin.sh

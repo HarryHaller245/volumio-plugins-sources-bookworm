@@ -546,6 +546,18 @@ class FaderController extends FaderEventEmitter {
         });
         positions.splice(this.config.queueOverflow);
       }
+
+      const targetByIndex = new Map();
+      positions.forEach(pos => {
+        targetByIndex.set(pos.index, pos.value);
+      });
+
+      targetByIndex.forEach((targetPosition, index) => {
+        if (this.midiQueue.feedbackTracker.isTrackingFeedback(index)) {
+          this.midiQueue.feedbackTracker.clearFeedback(index);
+        }
+        this.midiQueue.feedbackTracker.trackFeedbackStart(index, targetPosition);
+      });
   
       await Promise.all(positions.map(pos => {
         const message = [
