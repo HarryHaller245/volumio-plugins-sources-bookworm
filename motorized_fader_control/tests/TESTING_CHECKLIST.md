@@ -1,8 +1,53 @@
 # Testing Checklist - motorized_fader_control
 
-**Status**: 🔵 TESTING PHASE 1 - CALIBRATION  
+**Status**: � TESTING PHASE 0 - HARDWARE VALIDATION (IN PROGRESS)  
 **Date Started**: February 7, 2026  
-**Test Sequence**: 1. Calibration → 2. Playback (Track/Album) → 3. Volume Control
+**Test Sequence**: 0. Hardware Validation → 1. Calibration → 2. Playback (Track/Album) → 3. Volume Control
+
+---
+
+## 📋 PHASE 0: HARDWARE VALIDATION (Feb 8, 2026)
+
+### Test 0.1: Speed Variations ✅ COMPLETED
+**Test File:** `test_hardware_speed.js`  
+**Date:** February 8, 2026  
+**Status:** ✅ PASSED
+
+**Results:**
+- ✅ Speed 10 (SLOW): 89 positions, 29ms, smooth movement
+- ✅ Speed 50 (MEDIUM): 49 positions, 35ms, smooth movement
+- ✅ Speed 100 (FAST): 1 position, 2ms, instant jump
+- ✅ Both faders synchronized: 98 positions, 18ms, perfect sync
+
+**Observations:**
+- Speed 10 still quite fast (not as slow as expected)
+- Speed 50-100 difference not very noticeable
+- All movements smooth, no jitter or stuttering
+- Both faders tracked perfectly together
+
+**Action Items:**
+- [ ] Test software vs hardware feedback to evaluate speed perception impact
+- [ ] Consider adding slower speed options (e.g., speed 5 or 1)
+
+---
+
+### Test 0.2: Software vs Hardware Feedback
+**Test File:** TBD  
+**Purpose:** Compare movement behavior with simulated vs real hardware feedback  
+**Status:** ⚪ PENDING
+
+**Test Plan:**
+1. Test with `feedback_midi: false` (software simulation only)
+2. Test with `feedback_midi: true` (hardware feedback from Arduino)
+3. Compare speed perception, smoothness, accuracy
+4. Document any differences in movement quality
+
+---
+
+### Test 0.3: Manual Calibration
+**Test File:** `test_hardware_fader_flow.js`  
+**Purpose:** Testing manual calibration flow with real hardware  
+**Status:** ⚪ PENDING
 
 ---
 

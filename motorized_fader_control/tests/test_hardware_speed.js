@@ -114,21 +114,29 @@ function promptContinue(question) {
   return new Promise(resolve => {
     let timeoutId = null;
 
-    if (agentMode && inputTimeoutMs > 0) {
-      timeoutId = setTimeout(() => {
-        rl.close();
-        console.log('No input received. Auto-continuing in agent mode.');
-        resolve();
-      }, inputTimeoutMs);
-    }
+    // Wait for debug output to complete before showing prompt
+    setTimeout(() => {
+      // Add visual separator to make prompt stand out
+      console.log('\n' + '='.repeat(70));
+      console.log('>>> USER INPUT REQUIRED <<<');
+      console.log('='.repeat(70));
 
-    rl.question(question, () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+      if (agentMode && inputTimeoutMs > 0) {
+        timeoutId = setTimeout(() => {
+          rl.close();
+          console.log('No input received. Auto-continuing in agent mode.');
+          resolve();
+        }, inputTimeoutMs);
       }
-      rl.close();
-      resolve();
-    });
+
+      rl.question(question, () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        rl.close();
+        resolve();
+      });
+    }, 1000); // 1 second delay to let debug output complete
   });
 }
 
@@ -136,32 +144,33 @@ async function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function testSpeed(faderController, faderIndex, speed, label) {
+async function testSpeed(faderController, faderIndex, speed, label, disableFeedback, feedbackMode) {
   console.log(`\n🎯 Testing FADER ${faderIndex} at SPEED ${speed} (${label})`);
+  console.log(`📡 Feedback Mode: ${feedbackMode}`);
   console.log('Prepare to observe the fader movement...');
   
   await wait(1500); // Let logs settle before prompt
-  await promptContinue('Press ENTER to START the move (0 → 100)...');
+  await promptContinue(`Press ENTER to START the move (0 → 100) [${feedbackMode}]...`);
   
   const startTime = Date.now();
   await faderController.moveFaders(
     new FaderMove([faderIndex], [100], [speed], 1),
     false,
-    false
+    disableFeedback
   );
   const duration = Date.now() - startTime;
   
   console.log(`Duration: ${duration}ms`);
-  console.log('Did the fader move smoothly from 0 to 100?');
+  console.log(`Did the fader move smoothly from 0 to 100? [${feedbackMode}]`);
   
   await wait(1500); // Let logs settle before prompt
-  await promptContinue('Press ENTER to RETURN to zero...');
+  await promptContinue(`Press ENTER to RETURN to zero [${feedbackMode}]...`);
   
   const returnStart = Date.now();
   await faderController.moveFaders(
     new FaderMove([faderIndex], [0], [speed], 1),
     false,
-    false
+    disableFeedback
   );
   const returnDuration = Date.now() - returnStart;
   
@@ -192,40 +201,81 @@ async function run() {
   const faderIndex = 0; // Test on fader 0
   const speeds = [10, 50, 100];
 
-  // Test each speed
+  // Test each speed in BOTH feedback modes
   for (const speed of speeds) {
     let label = '';
     if (speed === 10) label = 'SLOW';
     else if (speed === 50) label = 'MEDIUM';
     else if (speed === 100) label = 'FAST';
 
-    await testSpeed(plugin.faderController, faderIndex, speed, label);
+    console.log('\n' + '='.repeat(70));
+    console.log(`SPEED ${speed} (${label}) - COMPARISON TEST`);
+    console.log('='.repeat(70));
+
+    // First: Software Feedback (simulated)
+    console.log('\n--- MODE 1: SOFTWARE FEEDBACK (Simulated) ---');
+    await testSpeed(plugin.faderController, faderIndex, speed, label, true, 'SOFTWARE');
+    
+    await wait(2000); // Pause between modes
+    
+    // Second: Hardware Feedback (real MIDI from Arduino)
+    console.log('\n--- MODE 2: HARDWARE FEEDBACK (Arduino MIDI) ---');
+    await testSpeed(plugin.faderController, faderIndex, speed, label, false, 'HARDWARE');
+    
+    await wait(2000); // Pause before next speed
   }
 
-  // Test both faders at same speed
-  console.log('\n\n📊 Testing BOTH FADERS at SPEED 50 (MEDIUM)');
-  console.log('Prepare to observe both faders moving together...');
+  // Test both faders at same speed with both feedback modes
+  console.log('\n\n' + '='.repeat(70));
+  console.log('📊 DUAL FADER TEST at SPEED 50 (MEDIUM)');
+  console.log('='.repeat(70));
 
+  // Software feedback mode
+  console.log('\n--- MODE 1: SOFTWARE FEEDBACK (Simulated) ---');
   await plugin.faderController.reset([0, 1]);
   
-  await wait(1500); // Let logs settle before prompt
-  await promptContinue('Press ENTER to move BOTH faders to 100...');
-  const bothStart = Date.now();
+  await wait(1500);
+  await promptContinue('Press ENTER to move BOTH faders to 100 [SOFTWARE]...');
+  const softStart = Date.now();
   await plugin.faderController.moveFaders(
     new FaderMove([0, 1], [100, 100], [50, 50], 1),
     false,
-    false
+    true // disableFeedback = true
   );
-  const bothDuration = Date.now() - bothStart;
-  console.log(`Both faders duration: ${bothDuration}ms`);
-  console.log('Did BOTH faders move together smoothly?');
+  const softDuration = Date.now() - softStart;
+  console.log(`Both faders duration [SOFTWARE]: ${softDuration}ms`);
 
-  await wait(1500); // Let logs settle before prompt
-  await promptContinue('Press ENTER to return BOTH to zero...');
+  await wait(1500);
+  await promptContinue('Press ENTER to return BOTH to zero [SOFTWARE]...');
   await plugin.faderController.moveFaders(
     new FaderMove([0, 1], [0, 0], [50, 50], 1),
     false,
-    false
+    true // disableFeedback = true
+  );
+
+  await wait(2000);
+
+  // Hardware feedback mode
+  console.log('\n--- MODE 2: HARDWARE FEEDBACK (Arduino MIDI) ---');
+  await plugin.faderController.reset([0, 1]);
+  
+  await wait(1500);
+  await promptContinue('Press ENTER to move BOTH faders to 100 [HARDWARE]...');
+  const hwStart = Date.now();
+  await plugin.faderController.moveFaders(
+    new FaderMove([0, 1], [100, 100], [50, 50], 1),
+    false,
+    false // disableFeedback = false
+  );
+  const hwDuration = Date.now() - hwStart;
+  console.log(`Both faders duration [HARDWARE]: ${hwDuration}ms`);
+
+  await wait(1500);
+  await promptContinue('Press ENTER to return BOTH to zero [HARDWARE]...');
+  await plugin.faderController.moveFaders(
+    new FaderMove([0, 1], [0, 0], [50, 50], 1),
+    false,
+    false // disableFeedback = false
   );
 
   if (typeof plugin.onStop === 'function') {

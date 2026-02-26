@@ -56,3 +56,38 @@ The following tests were removed after migrating from SYSEX to Pitch Bend:
 - Most tests support `--timeout=N` to override default input timeout (in seconds)
 - Tests automatically stop Volumio service to release USB port
 - Use Ctrl+C to cancel any running test
+
+---
+
+## Test Results
+
+### Hardware Speed Test (Feb 8, 2026)
+**Test:** `test_hardware_speed.js`  
+**Environment:** Arduino Nano, dual motorized faders @ 1 Mbps UART  
+**Config:** `feedback_midi: true`, `feedback_channel_offset: 4`
+
+#### Fader 0 - Individual Speed Testing
+| Speed | Positions Sent | Processing Time | Visual Quality | Notes |
+|-------|---------------|-----------------|----------------|-------|
+| 10 (SLOW) | 89 | 29ms | ✅ Smooth | Still fairly fast |
+| 50 (MEDIUM) | 49 | 35ms | ✅ Smooth | Good balance |
+| 100 (FAST) | 1 | 2ms | ✅ Smooth | Instant jump |
+
+#### Both Faders - Synchronized Movement (Speed 50)
+| Test | Positions | Processing Time | Synchronization | Notes |
+|------|-----------|-----------------|-----------------|-------|
+| Both → 100 | 98 | 18ms | ✅ Perfect | No lag between faders |
+| Both → 0 | 98 | - | ✅ Perfect | Synchronized return |
+
+#### Key Findings
+1. **Speed Perception**: Speed 10 is still quite fast; difference between 50-100 not very noticeable
+2. **Next Test Required**: Need to compare software vs hardware feedback to see speed impact
+3. **Movement Quality**: All movements smooth, no jitter or stuttering at any speed
+4. **Synchronization**: Both faders tracked perfectly together
+5. **Feedback Simulation**: Software feedback active during calibration-style resets (saw `[CALIB]` logs)
+
+#### Technical Notes
+- Position resolution varies by speed: slower = more positions (89 @ speed 10 vs 1 @ speed 100)
+- MIDI Queue processing very fast (2-35ms for full range moves)
+- Software feedback simulation triggered during `disableFeedback` mode
+- Hardware feedback on channels 4-5 (offset channels) working correctly

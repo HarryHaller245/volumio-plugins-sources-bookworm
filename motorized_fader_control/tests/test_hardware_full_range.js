@@ -114,21 +114,29 @@ function promptContinue(question) {
   return new Promise(resolve => {
     let timeoutId = null;
 
-    if (agentMode && inputTimeoutMs > 0) {
-      timeoutId = setTimeout(() => {
-        rl.close();
-        console.log('No input received. Auto-continuing in agent mode.');
-        resolve();
-      }, inputTimeoutMs);
-    }
+    // Wait for debug output to complete before showing prompt
+    setTimeout(() => {
+      // Add visual separator to make prompt stand out
+      console.log('\n' + '='.repeat(70));
+      console.log('>>> USER INPUT REQUIRED <<<');
+      console.log('='.repeat(70));
 
-    rl.question(question, () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+      if (agentMode && inputTimeoutMs > 0) {
+        timeoutId = setTimeout(() => {
+          rl.close();
+          console.log('No input received. Auto-continuing in agent mode.');
+          resolve();
+        }, inputTimeoutMs);
       }
-      rl.close();
-      resolve();
-    });
+
+      rl.question(question, () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        rl.close();
+        resolve();
+      });
+    }, 1000); // 1 second delay to let debug output complete
   });
 }
 
